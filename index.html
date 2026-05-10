@@ -1,0 +1,529 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <!-- 
+        BLACKHOLE by Asteroid.works
+        Admin Elevation: "Halley Young" Authentication Protocol.
+        Features: Admin deletion, Founder badges, and Manual Singularity.
+    -->
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Blackhole | Asteroid.works</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bh-bg: #050507;
+            --bh-accent: #6366f1;
+            --bh-admin: #f43f5e;
+        }
+        body { font-family: 'Inter', sans-serif; background-color: var(--bh-bg); color: #cbd5e1; }
+        .mono { font-family: 'JetBrains Mono', monospace; }
+        
+        .glass { background: rgba(15, 23, 42, 0.8); backdrop-filter: blur(12px); }
+        .border-void { border-color: rgba(255, 255, 255, 0.1); }
+        
+        ::-webkit-scrollbar { width: 4px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 10px; }
+        ::-webkit-scrollbar-thumb:hover { background: var(--bh-accent); }
+
+        @keyframes pulse-warning {
+            0%, 100% { color: #f43f5e; opacity: 1; }
+            50% { color: #9f1239; opacity: 0.7; }
+        }
+        .warning-active { animation: pulse-warning 1.5s infinite; }
+        
+        .message-entry { animation: fadeIn 0.3s ease-out forwards; }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .reaction-btn {
+            transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+        .reaction-btn:hover { transform: scale(1.2); }
+        .reaction-btn:active { transform: scale(0.9); }
+
+        .founder-glow {
+            box-shadow: 0 0 15px rgba(244, 63, 94, 0.2);
+            border: 1px solid rgba(244, 63, 94, 0.4) !important;
+        }
+
+        .edit-input {
+            background: rgba(15, 23, 42, 0.5);
+            border: 1px solid rgba(99, 102, 241, 0.3);
+            outline: none;
+            width: 100%;
+            padding: 4px 8px;
+            border-radius: 8px;
+            color: white;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col overflow-hidden">
+
+    <header class="p-5 border-b border-void glass sticky top-0 z-40 flex justify-between items-center">
+        <div>
+            <div class="flex items-center gap-3">
+                <div class="w-8 h-8 rounded-full bg-gradient-to-tr from-indigo-600 to-purple-600 flex items-center justify-center shadow-[0_0_15px_rgba(99,102,241,0.4)]">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><path d="M12 2a7 7 0 1 0 10 10"></path></svg>
+                </div>
+                <div>
+                    <h1 class="font-bold text-white tracking-tight text-lg leading-none">Blackhole</h1>
+                    <p class="text-[10px] uppercase tracking-[0.2em] text-slate-500 font-bold mt-1">Asteroid.works Protocol</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="flex flex-col items-end">
+            <div id="wipe-timer-container" class="mono text-xs flex items-center gap-2">
+                <button id="admin-purge-btn" onclick="executeSingularity()" class="hidden mr-2 text-[10px] bg-red-500/10 hover:bg-red-500/20 text-red-500 border border-red-500/20 px-2 py-0.5 rounded uppercase tracking-tighter transition-all">Force Purge</button>
+                <span class="text-slate-500 text-[10px] uppercase tracking-widest">Next Purge:</span>
+                <span id="countdown" class="text-white font-medium">--:--:--</span>
+            </div>
+            <div class="w-32 h-1 bg-slate-800 rounded-full mt-2 overflow-hidden">
+                <div id="wipe-progress" class="h-full bg-indigo-500 transition-all duration-1000 ease-linear" style="width: 100%"></div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Screen 1: Call-sign entry -->
+    <div id="auth-overlay" class="fixed inset-0 bg-[#050507]/95 backdrop-blur-xl z-50 flex items-center justify-center p-6">
+        <div class="max-w-md w-full text-center">
+            <h2 class="text-3xl font-bold text-white mb-6">Establish Connection</h2>
+            <input type="text" id="username-input" maxlength="20" placeholder="Choose a callsign..." 
+                   class="w-full p-4 bg-slate-900/50 border border-slate-800 rounded-2xl text-white outline-none focus:border-indigo-500 transition-all text-center text-lg mono mb-4">
+            <button onclick="processInitialEntry()" class="w-full bg-indigo-600 text-white font-bold py-4 rounded-2xl hover:bg-indigo-500 transition-all active:scale-[0.98]">
+                Next
+            </button>
+        </div>
+    </div>
+
+    <!-- Screen 1.5: Admin Verification (Secret) -->
+    <div id="admin-verify-overlay" class="fixed inset-0 bg-[#050507]/98 backdrop-blur-3xl z-[55] flex items-center justify-center hidden p-6">
+        <div class="max-w-md w-full text-center">
+            <div class="mb-8 flex justify-center">
+                <div class="w-12 h-12 rounded-xl bg-red-500/10 border border-red-500/20 flex items-center justify-center text-red-500">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+                </div>
+            </div>
+            <p class="text-slate-400 text-xs mono uppercase tracking-[0.3em] mb-6">Verification Required</p>
+            <textarea id="admin-key-input" rows="3" placeholder="..." 
+                      class="w-full p-4 bg-slate-900/80 border border-slate-800 rounded-2xl text-white outline-none focus:border-red-500 transition-all text-center text-sm mono mb-6 resize-none"></textarea>
+            <button onclick="verifyAdminKey()" class="w-full bg-red-600/10 hover:bg-red-600/20 text-red-500 border border-red-500/30 font-bold py-4 rounded-2xl transition-all">
+                Authenticate
+            </button>
+        </div>
+    </div>
+
+    <!-- Screen 2: Cookie/Microchip Consent -->
+    <div id="cookie-overlay" class="fixed inset-0 bg-[#050507]/98 backdrop-blur-2xl z-[60] flex items-center justify-center hidden p-6">
+        <div class="max-w-md w-full">
+            <div class="bg-indigo-900/10 border border-indigo-500/20 p-8 rounded-3xl text-center shadow-2xl">
+                <div class="w-16 h-16 bg-indigo-500/20 rounded-full flex items-center justify-center mx-auto mb-6 text-3xl">🍪</div>
+                <h2 class="text-2xl font-bold text-white mb-4">Wait! Try these cookies...</h2>
+                <p class="text-slate-400 text-sm leading-relaxed mb-8">
+                    But first you gotta try these cookies, they have micro chips in them that help us your data. 
+                    <br><br>
+                    <span class="text-[10px] text-slate-500 uppercase tracking-widest">Warning: Denying will result in volatile data loss on refresh.</span>
+                </p>
+                <div class="grid grid-cols-2 gap-4">
+                    <button onclick="handleConsent(false)" class="p-4 border border-slate-700 rounded-2xl text-slate-400 hover:bg-slate-800 transition-all">
+                        Deny
+                    </button>
+                    <button onclick="handleConsent(true)" class="p-4 bg-white text-black font-bold rounded-2xl hover:bg-indigo-100 transition-all shadow-[0_0_20px_rgba(255,255,255,0.2)]">
+                        Accept Chips
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <main class="flex-1 overflow-hidden flex flex-col relative">
+        <div id="message-display" class="flex-1 overflow-y-auto p-4 md:p-8 space-y-8">
+            <!-- Messages appear here -->
+        </div>
+        <div id="scroll-indicator" class="hidden absolute bottom-24 left-1/2 -translate-x-1/2 px-4 py-2 bg-indigo-600 text-white rounded-full text-xs cursor-pointer shadow-lg animate-bounce">
+            New signals detected ↓
+        </div>
+    </main>
+
+    <footer class="p-4 md:p-6 border-t border-void glass">
+        <div class="max-w-4xl mx-auto flex gap-3">
+            <input type="text" id="chat-input" placeholder="Broadcast into the dark..." 
+                   class="flex-1 p-4 bg-slate-900 border border-slate-800 rounded-2xl text-white outline-none focus:border-indigo-500 transition-all placeholder:text-slate-600">
+            <button onclick="broadcastMessage()" class="bg-indigo-600 text-white px-6 rounded-2xl hover:bg-indigo-500 transition-all flex items-center justify-center shadow-lg shadow-indigo-500/20 active:scale-95">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
+            </button>
+        </div>
+    </footer>
+
+    <script>
+        const CONFIG = {
+            COOKIE_NAME: 'bh_session_v1',
+            ADMIN_COOKIE_NAME: 'bh_admin_flag',
+            STORAGE_KEY: 'bh_data_store',
+            LAST_WIPE_KEY: 'bh_last_wipe_hour',
+            BRAND: 'ASTEROID.WORKS',
+            EMOJIS: ['🔥', '🚀', '👾', '🖤', '🌌'],
+            ADMIN_KEY: '1281391273828987314017398473894728346132874601273461726'
+        };
+
+        let state = {
+            currentUser: null,
+            isAdmin: false,
+            messages: [],
+            isAtBottom: true,
+            hasConsent: false,
+            editingId: null
+        };
+
+        const saveToStorage = () => {
+            if (state.hasConsent) {
+                localStorage.setItem(CONFIG.STORAGE_KEY, JSON.stringify(state.messages));
+            }
+        };
+
+        const loadMessages = () => {
+            const saved = localStorage.getItem(CONFIG.STORAGE_KEY);
+            if (saved) {
+                state.messages = JSON.parse(saved);
+                renderMessages();
+                scrollToBottom();
+            }
+        };
+
+        const setCookie = (name, value, hours) => {
+            const d = new Date();
+            d.setTime(d.getTime() + (hours * 60 * 60 * 1000));
+            document.cookie = `${name}=${value};expires=${d.toUTCString()};path=/;SameSite=Lax`;
+        };
+
+        const getCookie = (name) => {
+            const value = `; ${document.cookie}`;
+            const parts = value.split(`; ${name}=`);
+            if (parts.length === 2) return parts.pop().split(';').shift();
+            return null;
+        };
+
+        const clearCookie = (name) => {
+            document.cookie = name + '=; Max-Age=-99999999;';
+        };
+
+        window.onload = () => {
+            checkSystemTimeWipe();
+            
+            const savedUser = getCookie(CONFIG.COOKIE_NAME);
+            const isAdmin = getCookie(CONFIG.ADMIN_COOKIE_NAME) === 'true';
+            
+            if (savedUser) {
+                state.currentUser = savedUser;
+                state.isAdmin = isAdmin;
+                state.hasConsent = true;
+                if (state.isAdmin) toggleAdminUI(true);
+                loadMessages();
+                document.getElementById('auth-overlay').classList.add('hidden');
+            }
+
+            document.getElementById('chat-input').addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') broadcastMessage();
+            });
+
+            const display = document.getElementById('message-display');
+            display.addEventListener('scroll', () => {
+                state.isAtBottom = (display.scrollHeight - display.scrollTop) <= (display.clientHeight + 100);
+                if (state.isAtBottom) document.getElementById('scroll-indicator').classList.add('hidden');
+            });
+
+            startClockCycle();
+        };
+
+        const processInitialEntry = () => {
+            const username = document.getElementById('username-input').value.trim();
+            if (username.length < 2) return;
+            
+            state.currentUser = username;
+            
+            if (username === "Halley Young") {
+                document.getElementById('auth-overlay').classList.add('hidden');
+                document.getElementById('admin-verify-overlay').classList.remove('hidden');
+            } else {
+                showCookieConsent();
+            }
+        };
+
+        const verifyAdminKey = () => {
+            const input = document.getElementById('admin-key-input').value.trim();
+            if (input === CONFIG.ADMIN_KEY) {
+                state.isAdmin = true;
+                document.getElementById('admin-verify-overlay').classList.add('hidden');
+                showCookieConsent();
+            } else {
+                document.getElementById('admin-key-input').value = "";
+                document.getElementById('admin-key-input').classList.add('border-red-500');
+                setTimeout(() => document.getElementById('admin-key-input').classList.remove('border-red-500'), 1000);
+            }
+        };
+
+        const showCookieConsent = () => {
+            document.getElementById('auth-overlay').classList.add('hidden');
+            document.getElementById('cookie-overlay').classList.remove('hidden');
+        };
+
+        const handleConsent = (accepted) => {
+            state.hasConsent = accepted;
+            if (accepted) {
+                setCookie(CONFIG.COOKIE_NAME, state.currentUser, 1);
+                if (state.isAdmin) setCookie(CONFIG.ADMIN_COOKIE_NAME, 'true', 1);
+            }
+            if (state.isAdmin) toggleAdminUI(true);
+            document.getElementById('cookie-overlay').classList.add('hidden');
+            systemLog(`${state.currentUser} established a ${accepted ? 'stable' : 'volatile'} connection.`);
+            loadMessages();
+        };
+
+        const toggleAdminUI = (show) => {
+            const btn = document.getElementById('admin-purge-btn');
+            if (show) btn.classList.remove('hidden');
+            else btn.classList.add('hidden');
+        };
+
+        const broadcastMessage = () => {
+            const input = document.getElementById('chat-input');
+            const text = input.value.trim();
+            if (!text || !state.currentUser) return;
+
+            const msg = {
+                id: Date.now() + Math.random(),
+                sender: state.currentUser,
+                content: text,
+                time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                type: 'user',
+                isAdmin: state.isAdmin,
+                reactions: {}
+            };
+
+            state.messages.push(msg);
+            saveToStorage();
+            renderMessages();
+            input.value = '';
+            scrollToBottom();
+        };
+
+        const deleteMessage = (id) => {
+            const msg = state.messages.find(m => m.id === id);
+            if (!state.isAdmin && (!msg || msg.sender !== state.currentUser)) return;
+            
+            state.messages = state.messages.filter(m => m.id !== id);
+            saveToStorage();
+            renderMessages();
+        };
+
+        const startEdit = (id) => {
+            state.editingId = id;
+            renderMessages();
+        };
+
+        const cancelEdit = () => {
+            state.editingId = null;
+            renderMessages();
+        };
+
+        const saveEdit = (id) => {
+            const input = document.getElementById(`edit-field-${id}`);
+            const newContent = input.value.trim();
+            if (newContent) {
+                const msg = state.messages.find(m => m.id === id);
+                if (msg && (msg.sender === state.currentUser || state.isAdmin)) {
+                    msg.content = newContent;
+                    msg.isEdited = true;
+                }
+            }
+            state.editingId = null;
+            saveToStorage();
+            renderMessages();
+        };
+
+        const addReaction = (messageId, emoji) => {
+            const msg = state.messages.find(m => m.id === messageId);
+            if (msg) {
+                if (!msg.reactions[emoji]) msg.reactions[emoji] = [];
+                
+                const userIndex = msg.reactions[emoji].indexOf(state.currentUser);
+                if (userIndex > -1) {
+                    msg.reactions[emoji].splice(userIndex, 1);
+                    if (msg.reactions[emoji].length === 0) delete msg.reactions[emoji];
+                } else {
+                    msg.reactions[emoji].push(state.currentUser);
+                }
+                
+                saveToStorage();
+                renderMessages();
+            }
+        };
+
+        const systemLog = (content) => {
+            state.messages.push({
+                id: Date.now(),
+                sender: CONFIG.BRAND,
+                content: content,
+                type: 'system'
+            });
+            saveToStorage();
+            renderMessages();
+        };
+
+        const renderMessages = () => {
+            const container = document.getElementById('message-display');
+            
+            if (state.messages.length === 0) {
+                container.innerHTML = `
+                    <div class="flex flex-col items-center justify-center h-full opacity-20 pointer-events-none">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="mb-4"><circle cx="12" cy="12" r="10"></circle><circle cx="12" cy="12" r="3"></circle></svg>
+                        <p class="text-sm italic tracking-widest uppercase">The Void is Silent</p>
+                    </div>`;
+                return;
+            }
+
+            container.innerHTML = state.messages.map(msg => {
+                if (msg.type === 'system') {
+                    return `<div class="flex justify-center message-entry">
+                        <span class="text-[9px] mono text-indigo-500/60 uppercase tracking-[0.3em] bg-indigo-500/5 px-4 py-1 rounded-full border border-indigo-500/10">
+                            [ ${msg.content} ]
+                        </span>
+                    </div>`;
+                }
+
+                const isMe = msg.sender === state.currentUser;
+                const isEditing = state.editingId === msg.id;
+
+                const reactionList = Object.entries(msg.reactions || {}).map(([emoji, users]) => {
+                    const hasReacted = users.includes(state.currentUser);
+                    return `
+                    <button onclick="addReaction(${msg.id}, '${emoji}')" 
+                            class="text-[10px] ${hasReacted ? 'bg-indigo-500/20 border-indigo-500/50' : 'bg-slate-700/50 border-slate-600'} px-2 py-0.5 rounded-full border flex items-center gap-1 transition-all">
+                        ${emoji} <span class="font-bold ${hasReacted ? 'text-indigo-300' : 'text-white'}">${users.length}</span>
+                    </button>
+                `}).join('');
+
+                const emojiPicker = CONFIG.EMOJIS.map(e => `
+                    <button onclick="addReaction(${msg.id}, '${e}')" class="reaction-btn text-xs grayscale hover:grayscale-0 opacity-40 hover:opacity-100 transition-all">${e}</button>
+                `).join('');
+
+                const adminBadge = msg.isAdmin ? `<span class="bg-red-500 text-[8px] text-white px-1.5 py-0.5 rounded ml-2 font-bold tracking-widest">FOUNDER</span>` : '';
+                
+                const canManage = state.isAdmin || isMe;
+                const controls = canManage && !isEditing ? `
+                    <div class="flex gap-2 ml-4">
+                        <button onclick="startEdit(${msg.id})" class="text-slate-600 hover:text-indigo-400 transition-colors">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+                        </button>
+                        <button onclick="deleteMessage(${msg.id})" class="text-slate-600 hover:text-red-500 transition-colors">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                        </button>
+                    </div>
+                ` : '';
+
+                return `
+                    <div class="flex flex-col ${isMe ? 'items-end' : 'items-start'} message-entry group">
+                        <div class="flex items-center gap-2 mb-1 px-1">
+                            <span class="text-[10px] font-bold text-slate-500 uppercase tracking-tighter">${msg.sender}${adminBadge}</span>
+                        </div>
+                        <div class="relative max-w-[85%]">
+                            <div class="${msg.isAdmin ? 'founder-glow ' : ''} ${isMe ? 'bg-indigo-600 text-white rounded-2xl rounded-tr-none' : 'bg-slate-800/80 text-slate-100 rounded-2xl rounded-tl-none border border-slate-700'} p-4 text-sm leading-relaxed shadow-lg">
+                                ${isEditing ? `
+                                    <textarea id="edit-field-${msg.id}" class="edit-input text-sm" rows="2">${msg.content}</textarea>
+                                    <div class="flex justify-end gap-2 mt-2">
+                                        <button onclick="cancelEdit()" class="text-[10px] uppercase tracking-widest text-slate-400">Cancel</button>
+                                        <button onclick="saveEdit(${msg.id})" class="text-[10px] uppercase tracking-widest text-white font-bold bg-white/10 px-2 py-1 rounded">Update</button>
+                                    </div>
+                                ` : msg.content}
+                                
+                                <div class="text-[9px] mt-2 opacity-40 flex justify-between items-center mono">
+                                    <span>${msg.time}${msg.isEdited ? ' (edited)' : ''}</span>
+                                    ${controls}
+                                </div>
+                            </div>
+                            
+                            <div class="mt-2 flex flex-wrap gap-2 items-center">
+                                ${reactionList}
+                                <div class="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity ml-1 bg-slate-900/50 p-1 rounded-lg border border-slate-800">
+                                    ${emojiPicker}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        };
+
+        const scrollToBottom = () => {
+            const display = document.getElementById('message-display');
+            display.scrollTo({ top: display.scrollHeight, behavior: 'smooth' });
+            state.isAtBottom = true;
+            document.getElementById('scroll-indicator').classList.add('hidden');
+        };
+
+        const startClockCycle = () => {
+            setInterval(() => {
+                const now = new Date();
+                const mins = now.getMinutes();
+                const secs = now.getSeconds();
+                
+                const remainingMins = 59 - mins;
+                const remainingSecs = 59 - secs;
+                
+                const timeStr = `00:${remainingMins.toString().padStart(2, '0')}:${remainingSecs.toString().padStart(2, '0')}`;
+                const display = document.getElementById('countdown');
+                if (display) display.innerText = timeStr;
+
+                const percentLeft = ((3600 - (mins * 60 + secs)) / 3600) * 100;
+                const progress = document.getElementById('wipe-progress');
+                if (progress) progress.style.width = `${percentLeft}%`;
+
+                if (remainingMins < 5 && display) display.classList.add('warning-active');
+                else if (display) display.classList.remove('warning-active');
+
+                if (mins === 0 && secs === 0) executeSingularity();
+            }, 1000);
+        };
+
+        const checkSystemTimeWipe = () => {
+            const currentHour = new Date().getHours();
+            const lastWipeHour = localStorage.getItem(CONFIG.LAST_WIPE_KEY);
+
+            if (lastWipeHour !== null && parseInt(lastWipeHour) !== currentHour) {
+                executeSingularity();
+            }
+            localStorage.setItem(CONFIG.LAST_WIPE_KEY, currentHour.toString());
+        };
+
+        const executeSingularity = () => {
+            state.messages = [];
+            state.currentUser = null;
+            state.hasConsent = false;
+            state.isAdmin = false;
+            
+            localStorage.removeItem(CONFIG.STORAGE_KEY);
+            clearCookie(CONFIG.COOKIE_NAME);
+            clearCookie(CONFIG.ADMIN_COOKIE_NAME);
+            
+            toggleAdminUI(false);
+            renderMessages();
+            document.getElementById('auth-overlay').classList.remove('hidden');
+            document.getElementById('username-input').value = "";
+            document.getElementById('admin-key-input').value = "";
+            
+            const container = document.getElementById('message-display');
+            container.innerHTML = `
+                <div class="message-entry bg-indigo-900/20 border border-indigo-500/30 p-6 rounded-3xl text-center">
+                    <p class="mono text-indigo-400 text-xs tracking-tighter uppercase">Singularity Event Complete</p>
+                    <p class="text-slate-400 text-[10px] mt-2">All data crushed. Entropy restored.</p>
+                </div>
+            `;
+        };
+    </script>
+</body>
+</html>
